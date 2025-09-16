@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
@@ -19,7 +18,7 @@ export default defineConfig({
       manifest: {
         name: 'Shopping Lists App',
         short_name: 'ShopLists',
-        description: "Aplikasi untuk membuat, mengelola, dan berbagi shopping list antara user dan admin toko.",
+        description: 'Aplikasi untuk membuat, mengelola, dan berbagi shopping list antara user dan admin toko.',
         start_url: '/',
         scope: '/',
         display: 'standalone',
@@ -29,9 +28,12 @@ export default defineConfig({
         icons: [
           { src: '/icons/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icons/pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: '/icons/pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       }
     })
   ],
+  build: {
+    outDir: 'dist', // default vite build folder
+  }
 })

@@ -4,7 +4,18 @@
     { "src": "package.json", "use": "@vercel/static-build" }
   ],
   "routes": [
-    { "src": "/icons/(.*)", "headers": { "cache-control": "public, max-age=31536000, immutable" }, "dest": "/icons/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    {
+      "src": "/(.*)\\.(js|css|png|jpg|jpeg|svg|gif|webp|ico|json|webmanifest)",
+      "dest": "/$1.$2"
+    },
+    {
+      "src": "/icons/(.*)",
+      "headers": { "cache-control": "public, max-age=31536000, immutable" },
+      "dest": "/icons/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
   ]
 }
