@@ -3,10 +3,11 @@ import { useDrafts } from "../../context/DraftsContext";
 import { useEffect, useRef, useState } from "react";
 import html2canvas from "html2canvas-pro";
 import WAInputModal from "../../components/modals/WAInputModal";
+import { encodeBase64 } from "../../helper";
 
 export default function CheckoutPage() {
   const { id } = useParams();
-  const { drafts, updateDraftStatus } = useDrafts();
+  const { drafts, updateDraftStatus, exportDraft } = useDrafts();
   const navigate = useNavigate();
   const invoiceRef = useRef<HTMLDivElement>(null);
 
@@ -34,23 +35,34 @@ export default function CheckoutPage() {
   const totalItems = draft.items.reduce((sum, item) => sum + item.qty, 0);
 
   function handleSendToWA(phone?: string, customerName?: string) {
-    // base link ke draft untuk admin
-    const draftLink = `${window.location.origin}/admin/${draft?.id}/todo?as=admin`;
+    if (!draft) return;
 
+    // 1. export draft ke base64 JSON
+    const json = JSON.stringify(draft);
+    const encodedData = encodeBase64(json);
+
+    // 2. link untuk admin (import draft)
+    const draftLink = `${window.location.origin}/admin/import?data=${encodedData}`;
+
+    // 3. compose pesan WA
     const lines = [
-      `Halo ${customerName ? ` ${customerName}` : ""}`.trim(),
+      `Halo${customerName ? ` ${customerName}` : ""},`,
       ``,
-      `Saya mengirimkan list belanja: _${draft?.title}_ \n`,
-      `Total item: *${totalItems}*\n`,
+      `Saya mengirimkan list belanja: *${draft.title}*`,
+      `Total item: *${totalItems}*`,
       ``,
-      `Cek & edit:\n ${draftLink}\n`,
+      `Cek & edit langsung di link berikut:`,
+      `${draftLink}`,
       ``,
-      `Terima kasih!`,
-    ].filter(Boolean);
+      `Jika link terlalu panjang/tidak bisa diakses, berikut fallback JSON (copy-paste ke Import Draft):`,
+      `${json}`,
+      ``,
+      `Terima kasih 🙏`,
+    ];
 
     const message = lines.join("\n");
 
-    // jika phone disediakan -> kirim ke nomor itu, kalau tidak -> buka wa tanpa nomor (user pilih)
+    // 4. kirim via WA
     const encoded = encodeURIComponent(message);
     const waUrl = phone
       ? `https://wa.me/${phone}?text=${encoded}`
@@ -58,6 +70,32 @@ export default function CheckoutPage() {
 
     window.open(waUrl, "_blank");
   }
+
+
+  // function handleSendToWA(phone?: string, customerName?: string) {
+  //   // base link ke draft untuk admin
+  //   const draftLink = `${window.location.origin}/admin/${draft?.id}/todo?as=admin`;
+  //   const lines = [
+  //     `Halo ${customerName ? ` ${customerName}` : ""}`.trim(),
+  //     ``,
+  //     `Saya mengirimkan list belanja: _${draft?.title}_ \n`,
+  //     `Total item: *${totalItems}*\n`,
+  //     ``,
+  //     `Cek & edit:\n ${draftLink}\n`,
+  //     ``,
+  //     `Terima kasih!`,
+  //   ].filter(Boolean);
+
+  //   const message = lines.join("\n");
+
+  //   // jika phone disediakan -> kirim ke nomor itu, kalau tidak -> buka wa tanpa nomor (user pilih)
+  //   const encoded = encodeURIComponent(message);
+  //   const waUrl = phone
+  //     ? `https://wa.me/${phone}?text=${encoded}`
+  //     : `https://wa.me/?text=${encoded}`;
+
+  //   window.open(waUrl, "_blank");
+  // }
 
   const handleCapturePreview = async () => {
     if (!invoiceRef.current) return;
