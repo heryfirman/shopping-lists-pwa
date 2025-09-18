@@ -7,7 +7,7 @@ import { encodeBase64 } from "../../helper";
 
 export default function CheckoutPage() {
   const { id } = useParams();
-  const { drafts, updateDraftStatus, exportDraft } = useDrafts();
+  const { drafts, updateDraftStatus } = useDrafts();
   const navigate = useNavigate();
   const invoiceRef = useRef<HTMLDivElement>(null);
 
