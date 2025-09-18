@@ -3,7 +3,8 @@ import { useDrafts } from "../../context/DraftsContext";
 import { useEffect, useRef, useState } from "react";
 import html2canvas from "html2canvas-pro";
 import WAInputModal from "../../components/modals/WAInputModal";
-import { encodeBase64 } from "../../helper";
+// import { encodeBase64 } from "../../helper";
+import { encode as encodeBase64 } from "js-base64";
 
 export default function CheckoutPage() {
   const { id } = useParams();
@@ -42,7 +43,8 @@ export default function CheckoutPage() {
     const encodedData = encodeBase64(json);
 
     // 2. link untuk admin (import draft)
-    const draftLink = `${window.location.origin}/admin/import?data=${encodedData}`;
+      const draftLink = `${window.location.origin}/admin/import?role=admin&data=${encodedData}`;
+    // const draftLink = `${window.location.origin}/admin/import?data=${encodedData}`;
 
     // 3. compose pesan WA
     const lines = [

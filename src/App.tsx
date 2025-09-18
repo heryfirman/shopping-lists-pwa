@@ -23,6 +23,7 @@ import AdminConfirmPage from './pages/admin/AdminConfirmPage'
 import AdminPricePage from './pages/admin/AdminPricePage'
 import AdminInvoicePage from './pages/admin/AdminInvoicePage'
 import OwnerInvoicePage from './pages/drafts/OwnerInvoicePage'
+import AdminImportPage from './pages/admin/AdminImportPage'
 
 function App() {
   const location = useLocation();
@@ -56,6 +57,7 @@ function App() {
 
           <Route path='/drafts/:id/invoice' element={<OwnerInvoicePage />} />
 
+          <Route path='/admin/import' element={<AdminImportPage />} />
           <Route path='/admin/:id/todo' element={<AdminTodoPage />} />
           <Route path='/admin/:id/confirm' element={<AdminConfirmPage />} />
           <Route path='/admin/:id/price' element={<AdminPricePage />} />

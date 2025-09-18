@@ -2,14 +2,15 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 // import { mockDrafts } from "../data/mockDrafts";
 import type { Draft, DraftItem, DraftStatus, Role } from "../uitls/types/draft";
 import { v4 as uuidv4 } from "uuid";
-import { encodeBase64, decodeBase64 } from "../helper/index";
+// import { encodeBase64, decodeBase64 } from "../helper/index";
 
 type DraftsContextType = {
   drafts: Draft[];
   role: Role;
   setRole: (r: Role) => void;
-
+  
   addDraft: (title: string) => Draft;
+  importDraft: (draft: Draft) => Draft;
   updateDraft: (id: string, updates: Partial<Draft>) => void;
   updateDraftStatus: (id: string, status: DraftStatus) => void;
   deleteDraft: (id: string) => void;
@@ -34,8 +35,8 @@ type DraftsContextType = {
   toggleItemAvailability: (draftId: string, itemId: string) => void;
   setItemPrice: (draftId: string, itemId: string, price: number) => void;
 
-  exportDraft: (draftId: string) => string | null;
-  importDraft: (json: string) => Draft | null;
+  // exportDraft: (draftId: string) => string | null;
+  // importDraft: (json: string) => Draft | null;
 };
 
 const DraftsContext = createContext<DraftsContextType | undefined>(undefined);
@@ -281,28 +282,40 @@ export const DraftsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     );
   }
 
-  function exportDraft(draftId: string): string | null {
-    const draft = drafts.find((d) => d.id === draftId);
-    if (!draft) return null;
-    const json = JSON.stringify(draft);
-    return encodeBase64(json);
-  }
+  // Tambahan importDraft
+  const importDraft = (incoming: Draft): Draft => {
+    const newDraft: Draft = {
+      ...incoming,
+      id: incoming.id || uuidv4(), // kalau owner sudah ada id, pakai itu
+      createdAt: incoming.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setDrafts((prev) => [...prev, newDraft]);
+    return newDraft;
+  };
 
-  function importDraft(encoded: string): Draft | null {
-    try {
-      const json = decodeBase64(encoded);
-      const draft: Draft = JSON.parse(json);
-      // cek apakah sudah ada draft
-      const exists = drafts.some((d) => d.id === draft.id);
-      if (!exists) {
-        setDrafts((prev) => [...prev, draft]);
-      }
-      return draft;
-    } catch (err) {
-      console.error("Import draft gagal:", err);
-      return null;
-    }
-  }
+  // function exportDraft(draftId: string): string | null {
+  //   const draft = drafts.find((d) => d.id === draftId);
+  //   if (!draft) return null;
+  //   const json = JSON.stringify(draft);
+  //   return encodeBase64(json);
+  // }
+
+  // function importDraft(encoded: string): Draft | null {
+  //   try {
+  //     const json = decodeBase64(encoded);
+  //     const draft: Draft = JSON.parse(json);
+  //     // cek apakah sudah ada draft
+  //     const exists = drafts.some((d) => d.id === draft.id);
+  //     if (!exists) {
+  //       setDrafts((prev) => [...prev, draft]);
+  //     }
+  //     return draft;
+  //   } catch (err) {
+  //     console.error("Import draft gagal:", err);
+  //     return null;
+  //   }
+  // }
 
   return (
     <DraftsContext.Provider
@@ -323,8 +336,8 @@ export const DraftsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         saveDraft,
         toggleItemAvailability,
         setItemPrice,
-        exportDraft,
         importDraft,
+        // exportDraft,
       }}
     >
       {children}
