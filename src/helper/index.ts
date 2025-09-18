@@ -3,5 +3,9 @@ export function encodeBase64(str: string): string {
 }
 
 export function decodeBase64(str: string): string {
-    return decodeURIComponent(escape(atob(str)));
+    try {
+        return decodeURIComponent(escape(atob(str)));
+    } catch {
+        return "";
+    }
 }

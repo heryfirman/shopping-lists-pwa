@@ -1,42 +1,59 @@
-import { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDrafts } from "../../context/DraftsContext";
-import { decode as decodeBase64 } from "js-base64";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { decodeBase64 } from "../../helper";
 import type { Draft } from "../../uitls/types/draft";
 
 export default function AdminImportPage() {
-  const [searchParams] = useSearchParams();
+  const { addDraft } = useDrafts();
   const navigate = useNavigate();
-  const { importDraft } = useDrafts();
+  const [params] = useSearchParams();
+  const [manualJSON, setManualJSON] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const role = searchParams.get("role");
-    const encodedData = searchParams.get("data");
-
-    if (role === "admin" && encodedData) {
+    const data = params.get("data");
+    if (data) {
       try {
-        // 1. decode Base64 ke JSON
-        const json = decodeBase64(encodedData);
-        const parsed: Draft = JSON.parse(json);
-
-        // 2. simpan ke localStorage lewat context
-        const newDraft = importDraft(parsed);
-
-        // 3. redirect ke halaman todo admin
-        navigate(`/admin/${newDraft.id}/todo`, { replace: true });
-      } catch (err) {
-        console.error("Gagal import draft:", err);
-        alert("Gagal import draft, data tidak valid.");
-        navigate("/drafts");
+        const json = decodeBase64(data);
+        const draft: Draft = JSON.parse(json);
+        addDraft(draft.title); // simpan minimal
+        navigate(`/admin/${draft.id}/todo`);
+      } catch {
+        setError("❌ Gagal import dari link, silakan paste JSON manual.");
       }
-    } else {
-      navigate("/drafts");
     }
-  }, [searchParams, navigate, importDraft]);
+  }, [params, addDraft, navigate]);
+
+  function handleManualImport() {
+    try {
+      const draft: Draft = JSON.parse(manualJSON);
+      addDraft(draft.title);
+      navigate(`/admin/${draft.id}/todo`);
+    } catch {
+      setError("❌ JSON tidak valid, periksa kembali.");
+    }
+  }
 
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-50">
-      <p className="text-gray-600">Mengimpor draft...</p>
+    <div className="max-w-md mx-auto p-4 space-y-4">
+      <h1 className="text-lg font-semibold">Import Draft</h1>
+
+      {error && <p className="text-red-600">{error}</p>}
+
+      <textarea
+        value={manualJSON}
+        onChange={(e) => setManualJSON(e.target.value)}
+        placeholder="Paste JSON draft di sini..."
+        className="w-full h-40 border rounded p-2 text-sm"
+      />
+
+      <button
+        onClick={handleManualImport}
+        className="w-full bg-emerald-600 text-white py-2 rounded"
+      >
+        🚀 Import JSON
+      </button>
     </div>
   );
 }

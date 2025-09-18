@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import html2canvas from "html2canvas-pro";
 import WAInputModal from "../../components/modals/WAInputModal";
 // import { encodeBase64 } from "../../helper";
-import { encode as encodeBase64 } from "js-base64";
+// import { encode as encodeBase64 } from "js-base64";
+import { generateAdminImportLink } from "../../uitls/share";
+import type { Draft } from "../../uitls/types/draft";
 
 export default function CheckoutPage() {
   const { id } = useParams();
@@ -35,37 +37,28 @@ export default function CheckoutPage() {
 
   const totalItems = draft.items.reduce((sum, item) => sum + item.qty, 0);
 
+   // 🔹 Send link ke WA
   function handleSendToWA(phone?: string, customerName?: string) {
-    if (!draft) return;
+    const draftLink = generateAdminImportLink(draft as Draft);
 
-    // 1. export draft ke base64 JSON
-    const json = JSON.stringify(draft);
-    const encodedData = encodeBase64(json);
-
-    // 2. link untuk admin (import draft)
-      const draftLink = `${window.location.origin}/admin/import?role=admin&data=${encodedData}`;
-    // const draftLink = `${window.location.origin}/admin/import?data=${encodedData}`;
-
-    // 3. compose pesan WA
     const lines = [
       `Halo${customerName ? ` ${customerName}` : ""},`,
       ``,
-      `Saya mengirimkan list belanja: *${draft.title}*`,
+      `Saya mengirimkan list belanja: *${draft!.title}*`,
       `Total item: *${totalItems}*`,
       ``,
       `Cek & edit langsung di link berikut:`,
       `${draftLink}`,
       ``,
-      `Jika link terlalu panjang/tidak bisa diakses, berikut fallback JSON (copy-paste ke Import Draft):`,
-      `${json}`,
+      `Jika link gagal dibuka, gunakan JSON berikut:`,
+      `${JSON.stringify(draft)}`,
       ``,
       `Terima kasih 🙏`,
-    ];
+    ].filter(Boolean);
 
     const message = lines.join("\n");
-
-    // 4. kirim via WA
     const encoded = encodeURIComponent(message);
+
     const waUrl = phone
       ? `https://wa.me/${phone}?text=${encoded}`
       : `https://wa.me/?text=${encoded}`;
@@ -73,6 +66,23 @@ export default function CheckoutPage() {
     window.open(waUrl, "_blank");
   }
 
+  // 🔹 Kirim JSON langsung ke WA
+  function handleSendJSONtoWA(phone?: string) {
+    const json = JSON.stringify(draft, null, 2);
+    const encoded = encodeURIComponent(json);
+
+    const waUrl = phone
+      ? `https://wa.me/${phone}?text=${encoded}`
+      : `https://wa.me/?text=${encoded}`;
+
+    window.open(waUrl, "_blank");
+  }
+
+  // // 🔹 Copy JSON manual
+  // function handleCopyJSON() {
+  //   navigator.clipboard.writeText(JSON.stringify(draft, null, 2));
+  //   alert("✅ Draft JSON berhasil dicopy, bisa dikirim manual ke admin WA");
+  // }
 
   // function handleSendToWA(phone?: string, customerName?: string) {
   //   // base link ke draft untuk admin
@@ -214,6 +224,12 @@ export default function CheckoutPage() {
             className="flex-1 border rounded-md py-2 flex items-center justify-center gap-2"
           >
             ⬇️ Simpan
+          </button>
+          <button
+            onClick={() => handleSendJSONtoWA}
+            className="w-full border py-2 rounded"
+          >
+            📋 Copy JSON (Fallback)
           </button>
           <button
             onClick={() => setWAModalOpen(true)}
