@@ -1,321 +1,347 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-// import { mockDrafts } from "../data/mockDrafts";
 import type { Draft, DraftItem, DraftStatus, Role } from "../uitls/types/draft";
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  getDoc,
+  onSnapshot,
+  getDocs,
+  arrayUnion,
+  serverTimestamp,
+} from "firebase/firestore";
+import { db } from "../lib/firebase";
 import { v4 as uuidv4 } from "uuid";
-// import { encodeBase64, decodeBase64 } from "../helper/index";
+import type { Item } from "firebase/analytics";
 
 type DraftsContextType = {
   drafts: Draft[];
   role: Role;
   setRole: (r: Role) => void;
-  
-  addDraft: (title: string) => Draft;
-  importDraft: (draft: Draft) => Draft;
-  updateDraft: (id: string, updates: Partial<Draft>) => void;
-  updateDraftStatus: (id: string, status: DraftStatus) => void;
-  deleteDraft: (id: string) => void;
-  resetAllDrafts: () => void;
 
-  addItemToDraft: (draftId: string, item: Omit<DraftItem, "id">) => void;
+  addDraft: (title: string) => Promise<Draft>;
+  updateDraft: (id: string, updates: Partial<Draft>) => Promise<void>;
+  updateDraftStatus: (id: string, status: DraftStatus) => Promise<void>;
+  deleteDraft: (id: string) => Promise<void>;
+  resetAllDrafts: () => Promise<void>;
+
+  addItemToDraft: (
+    draftId: string,
+    item: Omit<DraftItem, "id">
+  ) => Promise<void>;
   updateItemInDraft: (
     draftId: string,
     itemId: string,
     updates: Partial<DraftItem>
-  ) => void;
-  removeItemsFromDraft: (draftId: string, itemsId: string[]) => void;
-  clearDraftItems: (draftId: string) => void;
-  loadDraftItems: (draftId: string) => void;
+  ) => Promise<void>;
+  removeItemsFromDraft: (draftId: string, itemsId: string[]) => Promise<void>;
+  clearDraftItems: (draftId: string) => Promise<void>;
+  loadDraftItems: (draftId: string) => Promise<Item[]>;
+  loadDraftItemsFromBackup: (draftId: string) => Promise<void>;
 
   saveDraft: (
     draftId: string,
     updates?: Partial<Omit<Draft, "id" | "items" | "createdAt">>
-  ) => void;
+  ) => Promise<void>;
 
-  // Khusus admin
-  toggleItemAvailability: (draftId: string, itemId: string) => void;
-  setItemPrice: (draftId: string, itemId: string, price: number) => void;
-
-  // exportDraft: (draftId: string) => string | null;
-  // importDraft: (json: string) => Draft | null;
+  toggleItemAvailability: (draftId: string, itemId: string) => Promise<void>;
+  setItemPrice: (
+    draftId: string,
+    itemId: string,
+    price: number
+  ) => Promise<void>;
 };
 
 const DraftsContext = createContext<DraftsContextType | undefined>(undefined);
 
-export const DraftsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Pakai lazy initializer biar data dari localStorage dibaca sekali aja
-  const [drafts, setDrafts] = useState<Draft[]>(() => {
-    try {
-      const stored = localStorage.getItem("drafts");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+export const DraftsProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [role, setRoleState] = useState<Role>("owner");
 
-  // Load role (owner/admin)
-  const [role, setRoleState] = useState<Role>(() => {
-    try {
-      const stored = localStorage.getItem("role");
-      return (stored as Role) ?? "owner";
-    } catch {
-      return "owner";
-    }
-  });
-
-  // Persist drafts
+  /** ----------------------
+   * Realtime listener
+   * ---------------------*/
   useEffect(() => {
-    try {
-      localStorage.setItem("drafts", JSON.stringify(drafts));
-    } catch {
-      // ignore
-    }
-  }, [drafts]);
+    const unsubscribe = onSnapshot(collection(db, "drafts"), (snapshot) => {
+      const data: Draft[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Draft[];
+      setDrafts(data);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  // Persist role
-  useEffect(() => {
-    try {
-      localStorage.setItem("role",role);
-    } catch {
-      // ignore
-    }
-  }, [role]);
+  const setRole = (r: Role) => setRoleState(r);
 
-  const setRole = (r: Role) => {
-    setRoleState(r);
-  };
-
-  // Sync to localStorage whenever draft changes
-  // useEffect(() => {
-  //   localStorage.setItem("drafts", JSON.stringify(drafts));
-  // }, [drafts]);
-
- /** ----------------------
- * Draft-level operations
- * ---------------------*/
-  // add new Draft
-  const addDraft = (title: string): Draft => {
-    const newDraft: Draft = {
-      id: uuidv4(),
+  /** ----------------------
+   * Draft CRUD
+   * ---------------------*/
+  const addDraft = async (title: string): Promise<Draft> => {
+    const docRef = await addDoc(collection(db, "drafts"), {
       title,
       status: "in-progress",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
       items: [],
+      backupItems: [],
+    });
+    const newDraft: Draft = {
+      id: docRef.id,
+      title,
+      status: "in-progress",
+      items: [],
+      backupItems: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
-    setDrafts((prev) => [...prev, newDraft]);
     return newDraft;
   };
 
-  // Update draft
-  const updateDraft = (id: string, updates: Partial<Draft>) => {
-    setDrafts((prev) =>
-      prev.map((d) =>
-        d.id === id
-          ? { ...d, ...updates, updatedAt: new Date().toISOString() }
-          : d
-      )
+  const updateDraft = async (id: string, updates: Partial<Draft>) => {
+    await updateDoc(doc(db, "drafts", id), {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const updateDraftStatus = async (id: string, status: DraftStatus) => {
+    await updateDoc(doc(db, "drafts", id), {
+      status,
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const deleteDraft = async (id: string) => {
+    await deleteDoc(doc(db, "drafts", id));
+  };
+
+  const resetAllDrafts = async () => {
+    const snapshot = await getDocs(collection(db, "drafts"));
+    await Promise.all(
+      snapshot.docs.map((d) => deleteDoc(doc(db, "drafts", d.id)))
     );
   };
 
-  const updateDraftStatus = (id: string, status: DraftStatus) => {
-    setDrafts((prev) =>
-      prev.map((draft) =>
-        draft.id === id
-          ? { ...draft, status, updatedAt: new Date().toISOString() }
-          : draft
-      )
-    );
+  /** ----------------------
+   * Item-level operations
+   * ---------------------*/
+  const addItemToDraft = async (
+    draftId: string,
+    item: Omit<DraftItem, "id">
+  ) => {
+    const newItem = { ...item, id: uuidv4(), available: true };
+    await updateDoc(doc(db, "drafts", draftId), {
+      items: arrayUnion(newItem),
+      updatedAt: serverTimestamp(),
+    });
   };
 
-  // Delete draft
-  const deleteDraft = (id: string) => {
-    setDrafts((prev) => prev.filter((d) => d.id !== id));
-  };
-
-  // Reset All Drafts
-  function resetAllDrafts() {
-    setDrafts([]);
-    try {
-      localStorage.removeItem("drafts");
-      
-    } catch {
-      // 
-    }
-  };
-
- /** ----------------------
- * Item-level operations
- * ---------------------*/
-  // Add Item
-  function addItemToDraft(draftId: string, item: Omit<DraftItem, "id">) {
-    setDrafts((prev) =>
-      prev.map((draft) =>
-        draft.id === draftId
-          ? {
-              ...draft,
-              items: [...draft.items, { ...item, id: uuidv4() }],
-              updatedAt: new Date().toISOString(),
-            }
-          : draft
-      )
-    );
-  }
-
-  // Remove Item
-  function removeItemsFromDraft(draftId: string, itemsId: string[]) {
-    setDrafts((prev) =>
-      prev.map((draft) =>
-        draft.id === draftId
-          ? {
-              ...draft,
-              backupItems: draft.items,
-              items: draft.items.filter((item) => !itemsId.includes(item.id)),
-              updatedAt: new Date().toISOString(),
-            }
-          : draft
-      )
-    );
-  }
-
-  // Clear All Item
-  function clearDraftItems(draftId: string) {
-    setDrafts((prev) =>
-      prev.map((draft) =>
-        draft.id === draftId
-          ? {
-              ...draft,
-              backupItems: draft.items,
-              items: [],
-              updatedAt: new Date().toISOString(),
-            }
-          : draft
-      )
-    );
-  }
-
-  function loadDraftItems(draftId: string) {
-    setDrafts((prev) =>
-      prev.map((draft) =>
-        draft.id === draftId && draft.backupItems
-          ? {
-              ...draft,
-              items: draft.backupItems, // restore
-              backupItems: undefined, // reset setelah load
-              updatedAt: new Date().toISOString(),
-            }
-          : draft
-      )
-    );
-  }
-
-  function updateItemInDraft(
+  const updateItemInDraft = async (
     draftId: string,
     itemId: string,
     updates: Partial<DraftItem>
-  ) {
-    setDrafts((prev) =>
-      prev.map((d) =>
-        d.id === draftId
-          ? {
-              ...d,
-              items: d.items.map((it) =>
-                it.id === itemId ? { ...it, ...updates } : it
-              ),
-              updatedAt: new Date().toISOString(),
-            }
-          : d
-      )
-    );
-  }
+  ) => {
+    const ref = doc(db, "drafts", draftId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
 
- /** ----------------------
- * Save operations
- * ---------------------*/
-  function saveDraft(
-    draftId: string,
-    updates?: Partial<Omit<Draft, "id" | "items" | "createdAt">>
-  ) {
-    setDrafts((prev) =>
-      prev.map((draft) =>
-        draft.id === draftId
-          ? {
-              ...draft,
-              ...updates,
-              updatedAt: new Date().toISOString(),
-            }
-          : draft
-      )
+    const draft = snap.data() as Draft;
+    const updatedItems = draft.items.map((it) =>
+      it.id === itemId ? { ...it, ...updates } : it
     );
-  }
 
-  function toggleItemAvailability(draftId: string, itemId: string) {
-    setDrafts((prev) => 
-      prev.map((d) => 
-        d.id === draftId
-          ? {
-            ...d,
-            items: d.items.map((it) =>
-              it.id === itemId
-                ? { ...it, available: !it.available }
-                : it
-            ),
-            updatedAt: new Date().toISOString(),
-            }
-          : d
-      )
-    );
-  }
-
-  function setItemPrice(draftId: string, itemId: string, price: number) {
-    setDrafts((prev) =>
-      prev.map((d) =>
-        d.id === draftId
-          ? {
-              ...d,
-              items: d.items.map((it) =>
-                it.id === itemId ? { ...it, price } : it
-              ),
-              updatedAt: new Date().toISOString(),
-            }
-          : d
-      )
-    );
-  }
-
-  // Tambahan importDraft
-  const importDraft = (incoming: Draft): Draft => {
-    const newDraft: Draft = {
-      ...incoming,
-      id: incoming.id || uuidv4(), // kalau owner sudah ada id, pakai itu
-      createdAt: incoming.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setDrafts((prev) => [...prev, newDraft]);
-    return newDraft;
+    await updateDoc(ref, { items: updatedItems, updatedAt: serverTimestamp() });
   };
 
-  // function exportDraft(draftId: string): string | null {
-  //   const draft = drafts.find((d) => d.id === draftId);
-  //   if (!draft) return null;
-  //   const json = JSON.stringify(draft);
-  //   return encodeBase64(json);
-  // }
+  // Deleted Item + Backup
+  const removeItemsFromDraft = async (draftId: string, itemsId: string[]) => {
+    const ref = doc(db, "drafts", draftId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
 
-  // function importDraft(encoded: string): Draft | null {
-  //   try {
-  //     const json = decodeBase64(encoded);
-  //     const draft: Draft = JSON.parse(json);
-  //     // cek apakah sudah ada draft
-  //     const exists = drafts.some((d) => d.id === draft.id);
-  //     if (!exists) {
-  //       setDrafts((prev) => [...prev, draft]);
-  //     }
-  //     return draft;
-  //   } catch (err) {
-  //     console.error("Import draft gagal:", err);
-  //     return null;
-  //   }
-  // }
+    const draft = snap.data() as Draft;
+
+    // Simpan item yang dihapus ke backup, tapi hindari duplikasi
+    const removedItems = draft.items.filter((item) => itemsId.includes(item.id));
+    const backupToSave = draft.backupItems || [];
+
+    const updatedBackup = [
+      ...backupToSave.filter((b) => !removedItems.some((r) => r.id === b.id)),
+      ...removedItems,
+    ];
+
+    const updatedItems = draft.items.filter(
+      (item) => !itemsId.includes(item.id)
+    );
+
+    await updateDoc(ref, {
+      items: updatedItems,
+      backupItems: updatedBackup,
+      updatedAt: serverTimestamp(),
+    });
+
+    // Update local state
+    setDrafts((prev) =>
+      prev.map((d) =>
+        d.id === draftId
+          ? ({ ...d, items: updatedItems, backupItems: updatedBackup } as Draft)
+          : d
+      )
+    );
+  };
+
+  // Clear All Items + Backup
+  const clearDraftItems = async (draftId: string) => {
+    const ref = doc(db, "drafts", draftId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+
+    const draft = snap.data() as Draft;
+
+    if (!draft.items || draft.items.length === 0) return; // nothing to clear
+
+    // ⚠️ Tambahkan semua items ke backup sebelum di-clear
+    const backupToSave = draft.backupItems || [];
+
+    const updatedBackup = [
+      ...backupToSave.filter((b) => !draft.items.some((i) => i.id === b.id)), // hindari duplikasi
+      ...draft.items,
+    ];
+
+    await updateDoc(ref, {
+      items: [],
+      backupItems: updatedBackup,
+      updatedAt: serverTimestamp(),
+    });
+
+    // ⚠️ Update local state
+    setDrafts((prev) =>
+      prev.map((d) =>
+        d.id === draftId
+          ? ({ ...d, items: [], backupItems: updatedBackup } as Draft)
+          : d
+      )
+    );
+  };
+
+  // load items dari subcollection "items"
+  const loadDraftItems = async (draftId: string): Promise<Item[]> => {
+    try {
+      const itemsCol = collection(db, "drafts", draftId, "items");
+      const snapshot = await getDocs(itemsCol);
+      const items: Item[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...(doc.data() as Omit<Item, "id">),
+      }));
+      // Update local state juga
+      setDrafts((prev) =>
+        prev.map((d) => (d.id === draftId ? ({ ...d, items } as Draft) : d))
+      );
+
+      return items;
+    } catch (err) {
+      console.error("Failed to load draft items:", err);
+      return [];
+    }
+  };
+
+  const loadDraftItemsFromBackup = async (draftId: string) => {
+    const ref = doc(db, "drafts", draftId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+
+    const draft = snap.data() as Draft;
+
+    if (!draft.backupItems || draft.backupItems.length === 0) {
+      alert("⚠️ Tidak ada backup item untuk di-load!");
+      return;
+    }
+
+    // Hanya restore item yang hilang (tidak ada di items saat ini)
+    const currentItemIds = draft.items.map((i) => i.id);
+    const restoredItems = draft.backupItems.filter(
+      (b) => !currentItemIds.includes(b.id)
+    );
+
+    if (restoredItems.length === 0) {
+      alert("⚠️ Semua item backup sudah ada di draft!");
+      return;
+    }
+
+    const updatedItems = [...draft.items, ...restoredItems];
+
+    // Update Firestore
+    const remainingBackup = draft.backupItems.filter(
+      (b) => currentItemIds.includes(b.id) || !restoredItems.includes(b)
+    );
+
+    await updateDoc(ref, {
+      items: updatedItems,
+      backupItems: remainingBackup,
+      updatedAt: serverTimestamp(),
+    });
+
+    // Update local state
+    setDrafts((prev) =>
+      prev.map((d) =>
+        d.id === draftId
+          ? ({
+              ...d,
+              items: updatedItems,
+              backupItems: remainingBackup,
+            } as Draft)
+          : d
+      )
+    );
+  };
+
+  /** ----------------------
+   * Save & special ops
+   * ---------------------*/
+  const saveDraft = async (
+    draftId: string,
+    updates?: Partial<Omit<Draft, "id" | "items" | "createdAt">>
+  ) => {
+    await updateDoc(doc(db, "drafts", draftId), {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const toggleItemAvailability = async (draftId: string, itemId: string) => {
+    const ref = doc(db, "drafts", draftId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+
+    const draft = snap.data() as Draft;
+    const updatedItems = draft.items.map((it) =>
+      it.id === itemId ? { ...it, available: !it.available } : it
+    );
+
+    await updateDoc(ref, { items: updatedItems, updatedAt: serverTimestamp() });
+  };
+
+  const setItemPrice = async (
+    draftId: string,
+    itemId: string,
+    price: number
+  ) => {
+    const ref = doc(db, "drafts", draftId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+
+    const draft = snap.data() as Draft;
+    const updatedItems = draft.items.map((it) =>
+      it.id === itemId ? { ...it, price } : it
+    );
+
+    await updateDoc(ref, { items: updatedItems, updatedAt: serverTimestamp() });
+  };
 
   return (
     <DraftsContext.Provider
@@ -332,18 +358,17 @@ export const DraftsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         removeItemsFromDraft,
         clearDraftItems,
         loadDraftItems,
+        loadDraftItemsFromBackup,
         updateItemInDraft,
         saveDraft,
         toggleItemAvailability,
         setItemPrice,
-        importDraft,
-        // exportDraft,
       }}
     >
       {children}
     </DraftsContext.Provider>
   );
-}
+};
 
 export function useDrafts() {
   const ctx = useContext(DraftsContext);

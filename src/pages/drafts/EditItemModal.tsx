@@ -16,19 +16,26 @@ export default function EditItemModal() {
   const [unit, setUnit] = useState("pcs");
   const [qty, setQty] = useState(1);
   const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (item) {
       setName(item.name);
-      setUnit(item.unit);
-      setQty(item.qty);
+      setUnit(item.unit!);
+      setQty(item.qty!);
     }
     if (nameInputRef.current) {
       nameInputRef.current.focus();
     }
   }, [item]);
+
+  useEffect(() => {
+    if (!draft || !item) {
+      navigate(`/drafts/${id ?? ""}`);
+    }
+  }, [draft, item, id, navigate]);
 
   function handleClose() {
     navigate(-1); // kembali ke halaman sebelumnya (backgroundLocation)
@@ -50,18 +57,30 @@ export default function EditItemModal() {
       return;
     }
 
-    updateItemInDraft(id, itemId, {
-      name: name.trim(),
-      unit,
-      qty,
-    });
-    handleClose();
+    try {
+      updateItemInDraft(id, itemId, {
+        name: name.trim(),
+        unit,
+        qty,
+      });
+      handleClose(); 
+    } catch (err) {
+      console.error("Gagal update item:", err);
+      setError("Gagal update item. Coba lagi.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  function handleDelete() {
+  const handleDelete = async () => {
     if (!id || !itemId) return;
-    removeItemsFromDraft(id, [itemId]);
-    handleClose();
+    try {
+      await removeItemsFromDraft(id, [itemId]);
+      handleClose();
+    } catch (err) {
+      console.error("Gagal hapus item:", err);
+      setError("Gagal hapus item. Coba lagi.");
+    }
   }
 
   if (!draft || !item) {
@@ -151,7 +170,7 @@ export default function EditItemModal() {
             onClick={handleUpdate}
             className="w-full bg-emerald-600 text-white py-2 rounded-lg font-medium cursor-pointer"
           >
-            Update Item
+            {isSaving ? "Menyimpan..." : "Update Item"}
           </button>
         </div>
       </div>

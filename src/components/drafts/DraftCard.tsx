@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import type { Draft } from "../../uitls/types/draft";
+import { Timestamp } from "firebase/firestore";
 
 type Props = {
   draft: Draft;
@@ -10,10 +11,30 @@ type Props = {
 export default function DraftCard({ draft, onEdit, onView }: Props) {
   const navigate = useNavigate();
 
+  const formatDate = (dateStr: Date | Timestamp | string | number) => {
+    let date: Date;
+
+    if (dateStr instanceof Timestamp) {
+      date = dateStr.toDate();
+    } else {
+      date = new Date(dateStr);
+    }
+
+    if (isNaN(date.getTime())) return "-";
+
+    return new Intl.DateTimeFormat("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  };
+
   const openEdit = () => {
     if (onEdit) return onEdit(draft.id);
     navigate(`/drafts/${draft.id}/edit`);
-    console.log("ID draft active: ", draft.id)
+    console.log("ID draft active: ", draft.id);
   };
 
   const openView = () => {
@@ -22,7 +43,7 @@ export default function DraftCard({ draft, onEdit, onView }: Props) {
   };
 
   const totalItems = draft.items.length;
-  const totalQty = draft.items.reduce((sum, item) => sum + item.qty, 0);
+  const totalQty = draft.items.reduce((sum, item) => sum + item.qty!, 0);
 
   const badge =
     draft.status === "in-progress" ? (
@@ -41,7 +62,7 @@ export default function DraftCard({ draft, onEdit, onView }: Props) {
         <div className="w-full flex justify-between items-center">
           <span className="">{badge}</span>
           <span className="text-xs text-gray-950">
-            {new Date(draft.createdAt).toLocaleDateString()}
+            {formatDate(draft.createdAt)}
           </span>
         </div>
 

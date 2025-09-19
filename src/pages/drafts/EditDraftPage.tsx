@@ -1,11 +1,12 @@
 import { Link, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useDrafts } from "../../context/DraftsContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import EditItemModal from "./EditItemModal";
+import { Timestamp } from "firebase/firestore";
 
 export default function EditDraftPage() {
   const { id } = useParams();
-  const { drafts, updateDraft, removeItemsFromDraft, clearDraftItems, loadDraftItems, saveDraft } = useDrafts();
+  const { drafts, updateDraft, removeItemsFromDraft, clearDraftItems, loadDraftItemsFromBackup, saveDraft } = useDrafts();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -14,6 +15,13 @@ export default function EditDraftPage() {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   const draft = drafts.find((d) => d.id === id);
+  // local title state so we don't write to Firestore on every keystroke (write onBlur or Save)
+  const [title, setTitle] = useState(draft?.title ?? "");
+
+  useEffect(() => {
+    setTitle(draft?.title ?? "");
+  }, [draft?.title]);
+
   if (!draft) {
     return (
       <div className="p-4">
@@ -22,8 +30,17 @@ export default function EditDraftPage() {
     );
   }
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+  const formatDate = (dateStr: Date | Timestamp | string | number) => {
+    let date: Date;
+
+    if (dateStr instanceof Timestamp) {
+      date = dateStr.toDate();
+    } else {
+      date = new Date(dateStr);
+    }
+
+    if (isNaN(date.getTime())) return "-";
+
     return new Intl.DateTimeFormat("id-ID", {
       day: "2-digit",
       month: "short",
@@ -41,10 +58,19 @@ export default function EditDraftPage() {
     );
   }
 
-  const handleOrder = () => {
+  const handleOrder = async () => {
     if (!draft) return;
-    saveDraft(draft.id);
+    await saveDraft(draft.id);
     navigate(`/drafts/${draft.id}/checkout`);
+  }
+
+  // Save title on blur
+  const handleTitleBlur = async () => {
+    if (!draft) return;
+    const trimmed = title.trim();
+    if (trimmed && trimmed !== draft.title) {
+      await updateDraft(draft.id, { title: trimmed });
+    }
   }
 
   return (
@@ -53,8 +79,9 @@ export default function EditDraftPage() {
       <header className="border-b px-4 py-3">
         <input
           type="text"
-          value={draft.title}
-          onChange={(e) => updateDraft(draft.id, { title: e.target.value })}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={handleTitleBlur}
           className="text-2xl font-semibold border-b border-gray-300 focus:outline-none focus:border-emerald-500 w-full"
         />
         <div className="mt-2 flex justify-between items-start">
@@ -166,12 +193,13 @@ export default function EditDraftPage() {
         <div className="flex justify-between items-center">
           <div className="flex flex-1 items-center space-x-6 pl-2">
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (!draft.backupItems || draft.backupItems.length === 0) {
                   alert("Tidak ada data untuk di load kembali!!!");
                   return;
                 }
-                loadDraftItems(draft.id);
+                await loadDraftItemsFromBackup(draft.id);
+                // loadDraftItems(draft.id);
                 setSelectMode(false);
                 setSelectedItems([]);
               }}

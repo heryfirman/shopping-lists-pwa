@@ -25,7 +25,18 @@ export default function AdminPricePage() {
     if (draft) {
       // hanya ambil item yang tersedia
       const availableItems = draft.items.filter((it) => it.available);
-      setItems(availableItems.map((it) => ({ ...it, price: 0, subtotal: 0 })));
+      setItems(
+        availableItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          unit: item.unit || "",
+          qty: item.qty || 0,
+          price: 0,
+          subtotal: 0,
+          available: item.available,
+        }))
+      )
+      // setItems(availableItems.map((it) => ({ ...it, price: 0, subtotal: 0 })));
     }
   }, [draft]);
 

@@ -1,27 +1,26 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useDrafts } from "../../context/DraftsContext";
 
-
 export default function AdminTodoPage() {
-    const { id } = useParams();
-    const { drafts, toggleItemAvailability } = useDrafts();
-    const navigate = useNavigate();
+  const { id } = useParams();
+  const navigate = useNavigate();
 
-    const draft = drafts.find((d) => d.id === id);
+  const { drafts, toggleItemAvailability } = useDrafts();
+  const draft = drafts.find((d) => d.id === id);
 
-    if (!draft) {
-        return (
-            <div className="p-4">
-                <p className="text-gray-600">Draft not found</p>
-            </div>
-        );
-    }
-
-    const handleNext = () => {
-        navigate(`/admin/${draft.id}/confirm`);
-    };
-
+  if (!draft) {
     return (
+      <div className="p-4">
+        <p className="text-gray-600">Draft not found</p>
+      </div>
+    );
+  }
+
+  const handleNext = () => {
+    navigate(`/admin/${draft.id}/confirm`);
+  };
+
+  return (
     <div className="max-w-md mx-auto h-screen bg-white text-black flex flex-col">
       {/* Header */}
       <header className="border-b px-4 py-3 flex items-center gap-2">
@@ -43,7 +42,11 @@ export default function AdminTodoPage() {
               className="flex items-center justify-between py-2"
             >
               <div>
-                <span className={item.available ? "text-black" : "text-gray-400 line-through"}>
+                <span
+                  className={
+                    item.available ? "text-black" : "text-gray-400 line-through"
+                  }
+                >
                   {item.name} ({item.qty} {item.unit})
                 </span>
               </div>

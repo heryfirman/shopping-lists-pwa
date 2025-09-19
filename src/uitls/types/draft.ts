@@ -5,8 +5,8 @@ export type DraftStateItemStatus = 'available' | 'empty';
 export interface DraftItem {
   id: string;
   name: string;
-  unit: string;
-  qty: number;
+  unit?: string;
+  qty?: number;
   available?: boolean;
   price?: number;
   subtotal?: number;
@@ -17,8 +17,8 @@ export interface Draft {
     title: string;
     status: DraftStatus;
     items: DraftItem[];
-    createdAt: string;
-    updatedAt: string;
+    createdAt: Date;
+    updatedAt: Date;
     backupItems?: DraftItem[];
     totalPrice?: number;
 }

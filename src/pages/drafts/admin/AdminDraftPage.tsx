@@ -15,7 +15,7 @@ export default function AdminDraftPage() {
     return <div className="p-4 text-gray-500">Draft tidak ditemukan.</div>;
   }
 
-  const itemsAvailable = draft.items.filter((item) => item.qty > 0);
+  const itemsAvailable = draft.items.filter((item) => item.qty! > 0);
   const itemsEmpty = draft.items.filter((item) => item.qty === 0);
 
   const items = activeTab === "ada" ? itemsAvailable : itemsEmpty;

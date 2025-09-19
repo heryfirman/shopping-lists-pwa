@@ -2,6 +2,7 @@ import { Link, Route, Routes, useLocation, useNavigate, useParams } from "react-
 import { useDrafts } from "../../context/DraftsContext";
 import { useState } from "react";
 import EditItemModal from "./EditItemModal";
+import { Timestamp } from "firebase/firestore";
 
 export default function DraftDetailPage() {
   const { id } = useParams();
@@ -23,16 +24,26 @@ export default function DraftDetailPage() {
     );
   }
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat("id-ID", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date);
-  };
+  const formatDate = (dateStr: Date | Timestamp | string | number) => {
+      let date: Date;
+  
+      if (dateStr instanceof Timestamp) {
+        date = dateStr.toDate();
+      } else {
+        date = new Date(dateStr);
+      }
+  
+      if (isNaN(date.getTime())) return "-";
+      
+      return new Intl.DateTimeFormat("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date);
+    };
+  
 
   function toggleSelect(itemId: string) {
     setSelectedItems((prev) =>

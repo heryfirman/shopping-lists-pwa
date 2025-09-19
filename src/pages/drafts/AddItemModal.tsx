@@ -14,6 +14,7 @@ export default function AddItemModal() {
   const [qty, setQty] = useState(1);
 
   const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -21,13 +22,13 @@ export default function AddItemModal() {
     if (nameInputRef.current) {
       nameInputRef.current.focus();
     }
-  });
+  }, []);
 
   function handleClose() {
     navigate(`/drafts/${id}`);
   }
 
-  function handleAdd() {
+  const handleAdd = async () => {
     if (!id) return;
     if (!name.trim()) {
       setError("Nama produk wajib diisi");
@@ -41,13 +42,21 @@ export default function AddItemModal() {
       setError("Unit wajib dipilih");
       return;
     }
-    addItemToDraft(id, { name, unit, qty });
-    setName("");
-    setUnit("pcs");
-    setQty(1);
 
-    if (nameInputRef.current) {
-      nameInputRef.current.focus();
+    try {
+      addItemToDraft(id, { name, unit, qty });
+      setName("");
+      setUnit("pcs");
+      setQty(1);
+
+      if (nameInputRef.current) {
+        nameInputRef.current.focus();
+      } 
+    } catch (err) {
+      console.error("Gagal tambah item:", err);
+      setError("Gagal menyimpan item, Coba lagi.");
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -126,7 +135,7 @@ export default function AddItemModal() {
             onClick={handleAdd}
             className="w-full bg-emerald-600 text-white py-2 rounded-lg text-xl font-medium cursor-pointer"
           >
-            Tambah lagi +
+            {isSaving ? "Menyimpan..." : "Tambah lagi +"}
           </button>
         </div>
       </div>

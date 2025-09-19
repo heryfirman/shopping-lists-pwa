@@ -46,7 +46,7 @@ export default function OwnerInvoicePage() {
     <div className="max-w-md mx-auto h-screen bg-white text-black flex flex-col">
       {/* Header */}
       <header className="border-b px-4 py-3 flex items-center gap-2">
-        <button onClick={() => navigate(-1)} className="text-lg">
+        <button onClick={() => navigate(-1)} className="text-lg cursor-pointer">
           ←
         </button>
         <h1 className="text-xl font-semibold">Invoice</h1>

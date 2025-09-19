@@ -18,7 +18,7 @@ export default function AdminInvoicePage() {
   }
 
   const totalItems = draft.items.length;
-  const totalQty = draft.items.reduce((sum, item) => sum + item.qty, 0);
+  const totalQty = draft.items.reduce((sum, item) => sum + item.qty!, 0);
   const totalPrice =
     draft.totalPrice ??
     draft.items.reduce((sum, item) => sum + (item.subtotal || 0), 0);

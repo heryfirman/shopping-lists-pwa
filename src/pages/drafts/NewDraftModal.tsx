@@ -6,17 +6,26 @@ import { useDrafts } from "../../context/DraftsContext";
 
 export default function NewDraftModal() {
   const [draftName, setDraftName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
 
   const { addDraft } = useDrafts();
 
   const handleClose = () => navigate(-1);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!draftName.trim()) return;
+    
+    setIsSaving(true);
 
-    const newDraft = addDraft(draftName);
-    navigate(`/drafts/${newDraft.id}/edit`);
+    try {
+      const newDraft = await addDraft(draftName.trim());
+      navigate(`/drafts/${newDraft.id}/edit`);
+    } catch (err) {
+      console.error("Gagal membuat draft:", err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -52,10 +61,10 @@ export default function NewDraftModal() {
 
         <button
           onClick={handleNext}
-          disabled={!draftName.trim()}
+          disabled={!draftName.trim() || isSaving}
           className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-md text-sm font-medium shadow hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
         >
-          Next →
+          {isSaving? "Membuat..." : "Next →"}
         </button>
       </motion.div>
     </motion.div>

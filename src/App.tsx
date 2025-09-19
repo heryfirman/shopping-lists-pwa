@@ -24,6 +24,7 @@ import AdminPricePage from './pages/admin/AdminPricePage'
 import AdminInvoicePage from './pages/admin/AdminInvoicePage'
 import OwnerInvoicePage from './pages/drafts/OwnerInvoicePage'
 import AdminImportPage from './pages/admin/AdminImportPage'
+import DraftsTestPage from './pages/testpage/DraftsTestPage'
 
 function App() {
   const location = useLocation();
@@ -46,6 +47,8 @@ function App() {
       <DraftsProvider>
         <Routes location={state?.backgroundLocation || location}>
           <Route path='/' element={<HomePage />} />
+          <Route path='/draft-test' element={<DraftsTestPage />} />
+
           <Route path='/drafts' element={<AllDraftsPage />} />
           <Route path='/drafts/in-progress' element={<InProgressPage />} />
           <Route path='/drafts/done' element={<DonePage />} />
